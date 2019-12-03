@@ -58,6 +58,12 @@
 `define ILTypeMem 2'b10
 `define ILTypeUnd 2'b11
 
+// slow memory definitions
+`define LINEADDR [15:0]
+`define LINE [15:0]
+`define LINES [65535:0]
+`define MEMDELAY 4
+
 module testbench;
 reg reset = 0;
 reg clk = 0;
@@ -78,7 +84,92 @@ initial begin
 end
 endmodule
 
-module processor (halt, reset, clk);
+module processor(halt, reset, clk);
+output reg halt;
+input reset, clk;
+
+wire rdy;
+reg `LINE rdata, rdata0, rdata1, ccrdata0, ccrdata1;
+reg `LINE wdata, wdata0, wdata1, ccwdata0, ccwdata1;
+reg `LINEADDR addr, addr0, addr1, ccaddr0, ccaddr1;
+wire wtoo, wtoo0, wtoo1;
+wire strobe, strobe0, strobe1;
+wire ccstrobe0, ccstrobe1;
+wire ccupdate0, ccupdate1;
+wire in_tr0, in_tr1;
+wire stall0, stall1;
+
+slowmem16 DATAMEM(rdy, rdata, addr, wdata, wtoo, strobe, clk);
+
+core PE0(halt0, reset, clk, rdata0, addr0, wdata0, wtoo0, strobe0, in_tr0, stall0);
+cache C0(rdata0, addr0, wdata0, wtoo0, strobe0, clk, in_tr0, ccstrobe0, ccupdate0, ccrdata0, ccaddr0, ccwdata0, stall0);
+
+core PE1(halt1, reset, clk, rdata1, addr1, wdata1, wtoo1, strobe1, in_tr1, stall1);
+cache C1(rdata1, addr1, wdata1, wtoo1, strobe1, clk, in_tr1, ccstrobe1, ccupdate1, ccrdata1, ccaddr1, ccwdata1, stall1);
+endmodule
+
+module slowmem16 (rdy, rdata, addr, wdata, wtoo, strobe, clk);
+output reg rdy = 0;
+output reg `LINE rdata;
+input `LINEADDR addr;
+input `LINE wdata;
+input wtoo, strobe, clk;
+reg [7:0] busy = 0;
+reg `LINEADDR maddr;
+reg mwtoo;
+reg `LINE mwdata;
+reg `LINE m `LINES;
+
+initial begin
+  // put your memory initialization code here
+end
+
+always @(posedge clk) begin
+  if (busy == 1) begin
+    // complete request
+    rdata <= m[maddr];
+    if (mwtoo) m[maddr] <= mwdata;
+    busy <= 0;
+    rdy <= 1;
+  end else if (busy > 1) begin
+    // still waiting
+    busy <= busy - 1;
+  end else if (strobe) begin
+    // idle and new request
+    rdata <= 16'hxxxx;
+    maddr <= addr;
+    mwdata <= wdata;
+    mwtoo <= wtoo;
+    busy <= `MEMDELAY;
+    rdy <= 0;
+  end
+end
+endmodule
+
+module cache (rdata, addr, wdata, wtoo, strobe, clk, in_tr, ccstrobe, ccupdate, ccrdata, ccaddr, ccwdata, stall);
+output reg `LINE rdata;
+output `LINE ccwdata;
+output stall;
+inout `LINEADDR ccaddr;
+input `LINEADDR addr;
+input `LINE wdata;
+input wtoo, strobe, clk, in_tr, ccstrobe, ccupdate;
+input `LINE ccrdata;
+
+//Cache retrieval
+always @(posedge clk) begin
+end
+
+//Other cache coherency updates
+always @(posedge clk) begin
+end
+
+//Current cache coherency updates
+always @(posedge clk) begin
+end
+endmodule
+
+module core (halt, reset, clk, rdata, addr, wdata, wtoo, strobe, in_tr, stall);
 output reg halt;
 input reset, clk;
 reg `WORD  r  `REGSIZE;
