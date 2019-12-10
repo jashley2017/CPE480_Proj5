@@ -64,6 +64,15 @@
 `define LINES [65535:0]
 `define MEMDELAY 4
 
+// cache definitions
+`define CLINE [33:0]
+`define CLINES [7:0]
+`define DATABITS [15:0]
+`define ADDRBITS [31:16]
+`define DIRTYBIT [32]
+`define TIMEBIT [33]
+`define CPTR [2:0]
+
 module testbench;
 reg reset = 0;
 reg clk = 0;
@@ -102,10 +111,14 @@ wire stall0, stall1;
 slowmem16 DATAMEM(rdy, rdata, addr, wdata, wtoo, strobe, clk);
 
 core PE0(halt0, reset, clk, rdata0, addr0, wdata0, wtoo0, strobe0, in_tr0, stall0);
-cache C0(rdata0, addr0, wdata0, wtoo0, strobe0, clk, in_tr0, ccstrobe0, ccupdate0, ccrdata0, ccaddr0, ccwdata0, stall0);
+cache C0(rdata0, addr0, wdata0, wtoo0, strobe0, clk, in_tr0,
+ccstrobe0, ccupdate0, ccrdata0, ccaddr0, ccwdata0,
+ccstrobe1, ccaddr1, ccwdata1, stall0);
 
 core PE1(halt1, reset, clk, rdata1, addr1, wdata1, wtoo1, strobe1, in_tr1, stall1);
-cache C1(rdata1, addr1, wdata1, wtoo1, strobe1, clk, in_tr1, ccstrobe1, ccupdate1, ccrdata1, ccaddr1, ccwdata1, stall1);
+cache C1(rdata1, addr1, wdata1, wtoo1, strobe1, clk, in_tr1,
+ccstrobe1, ccupdate1, ccrdata1, ccaddr1, ccwdata1,
+ccstrobe0, ccaddr0, ccwdata0, stall1);
 endmodule
 
 module slowmem16 (rdy, rdata, addr, wdata, wtoo, strobe, clk);
@@ -146,7 +159,9 @@ always @(posedge clk) begin
 end
 endmodule
 
-module cache (rdata, addr, wdata, wtoo, strobe, clk, in_tr, ccstrobe, ccupdate, ccrdata, ccaddr, ccwdata, stall);
+module cache (rdata, addr, wdata, wtoo, strobe, clk,
+in_tr, ccstrobe, ccupdate, ccrdata, ccaddr, ccwdata,
+occstrobe, occaddr, occwdata, stall);
 output reg `LINE rdata;
 output `LINE ccwdata;
 output stall;
@@ -155,6 +170,13 @@ input `LINEADDR addr;
 input `LINE wdata;
 input wtoo, strobe, clk, in_tr, ccstrobe, ccupdate;
 input `LINE ccrdata;
+reg `CLINE cmem `CLINES; //Cache memory
+reg `CPTR cindex; //Current number of cache lines
+wire timereset; //Checks if all time bits are 1
+
+assign timereset = (cmem[0] `DIRTYBIT) && (cmem[1] `DIRTYBIT) && (cmem[2] `DIRTYBIT)
+&& (cmem[3] `DIRTYBIT) && (cmem[4] `DIRTYBIT) && (cmem[5] `DIRTYBIT)
+&& (cmem[6] `DIRTYBIT) && (cmem[7] `DIRTYBIT);
 
 //Cache retrieval
 always @(posedge clk) begin
@@ -162,10 +184,60 @@ end
 
 //Other cache coherency updates
 always @(posedge clk) begin
+  if(occstrobe) begin
+	  if(cmem[0] `ADDRBITS == occaddr) begin
+		  cmem[0] `DATABITS <= occwdata; cmem[0] `DIRTYBIT <= 1; cmem[0] `TIMEBIT <= 1; end
+		else if(cmem[1] `ADDRBITS == occaddr) begin
+			cmem[1] `DATABITS <= occwdata; cmem[1] `DIRTYBIT <= 1; cmem[1] `TIMEBIT <= 1; end
+		else if(cmem[2] `ADDRBITS == occaddr) begin
+		  cmem[2] `DATABITS <= occwdata; cmem[2] `DIRTYBIT <= 1; cmem[2] `TIMEBIT <= 1; end
+		else if(cmem[3] `ADDRBITS == occaddr) begin
+		  cmem[3] `DATABITS <= occwdata; cmem[3] `DIRTYBIT <= 1; cmem[3] `TIMEBIT <= 1; end
+		else if(cmem[4] `ADDRBITS == occaddr) begin
+		  cmem[4] `DATABITS <= occwdata; cmem[4] `DIRTYBIT <= 1; cmem[4] `TIMEBIT <= 1; end
+		else if(cmem[5] `ADDRBITS == occaddr) begin
+		  cmem[5] `DATABITS <= occwdata; cmem[5] `DIRTYBIT <= 1; cmem[5] `TIMEBIT <= 1; end
+		else if(cmem[6] `ADDRBITS == occaddr) begin
+		  cmem[6] `DATABITS <= occwdata; cmem[6] `DIRTYBIT <= 1; cmem[6] `TIMEBIT <= 1; end
+		else if(cmem[7] `ADDRBITS == occaddr) begin
+		  cmem[7] `DATABITS <= occwdata; cmem[7] `DIRTYBIT <= 1; cmem[7] `TIMEBIT <= 1; end
+	end
 end
 
-//Current cache coherency updates
+//Miss but in other cache
 always @(posedge clk) begin
+  if(ccupdate) begin
+		if(cmem[0] `ADDRBITS == ccaddr) begin
+		  cmem[0] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		else if(cmem[1] `ADDRBITS == ccaddr) begin
+		  cmem[1] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		else if(cmem[2] `ADDRBITS == ccaddr) begin
+		  cmem[2] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		else if(cmem[3] `ADDRBITS == ccaddr) begin
+		  cmem[3] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		else if(cmem[4] `ADDRBITS == ccaddr) begin
+		  cmem[4] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		else if(cmem[5] `ADDRBITS == ccaddr) begin
+		  cmem[5] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		else if(cmem[6] `ADDRBITS == ccaddr) begin
+		  cmem[6] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		else if(cmem[7] `ADDRBITS == ccaddr) begin
+		  cmem[7] `DATABITS <= ccrdata; rdata <= ccrdata; end
+	end
+end
+
+//Clear timebits
+always @(posedge clk) begin
+  if(timereset) begin
+	  cmem[0] `TIMEBIT <= 0;
+		cmem[1] `TIMEBIT <= 0;
+		cmem[2] `TIMEBIT <= 0;
+		cmem[3] `TIMEBIT <= 0;
+		cmem[4] `TIMEBIT <= 0;
+		cmem[5] `TIMEBIT <= 0;
+		cmem[6] `TIMEBIT <= 0;
+		cmem[7] `TIMEBIT <= 0;
+	end
 end
 endmodule
 
