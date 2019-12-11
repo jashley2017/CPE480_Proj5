@@ -165,11 +165,15 @@ occstrobe, occaddr, occwdata, stall);
 output reg `LINE rdata;
 output `LINE ccwdata;
 output stall;
+inout ccupdate;
 inout `LINEADDR ccaddr;
 input `LINEADDR addr;
 input `LINE wdata;
-input wtoo, strobe, clk, in_tr, ccstrobe, ccupdate;
+input wtoo, strobe, clk, in_tr, ccstrobe;
 input `LINE ccrdata;
+input occstrobe;
+input `LINEADDR occaddr;
+input `LINE occwdata;
 reg `CLINE cmem `CLINES; //Cache memory
 reg `CPTR cindex; //Current number of cache lines
 wire timereset; //Checks if all time bits are 1
@@ -180,6 +184,99 @@ assign timereset = (cmem[0] `DIRTYBIT) && (cmem[1] `DIRTYBIT) && (cmem[2] `DIRTY
 
 //Cache retrieval
 always @(posedge clk) begin
+  if(strobe) begin
+	  if(cmem[0] `ADDRBITS == addr) begin //Cache Hit
+		  rdata <= cmem[0] `DATABITS;
+			cmem[0] `TIMEBIT <= 1;
+			strobe <= 0;
+			if(wtoo) begin
+			  cmem[0] `DATABITS <= wdata;
+				cmem[0] `DIRTYBIT <= 1;
+				ccstrobe <= 1;
+				ccaddr <= addr;
+				ccwdata <= wdata;
+			end
+		end else if(cmem[1] `ADDRBITS == addr) begin
+		  rdata <= cmem[1] `DATABITS;
+		  cmem[1] `TIMEBIT <= 1;
+		  strobe <= 0;
+		  if(wtoo) begin
+			  cmem[1] `DATABITS <= wdata;
+			  cmem[1] `DIRTYBIT <= 1;
+			  ccstrobe <= 1;
+			  ccaddr <= addr;
+			  ccwdata <= wdata;
+		  end
+    end else if(cmem[2] `ADDRBITS == addr) begin
+		  rdata <= cmem[2] `DATABITS;
+		  cmem[2] `TIMEBIT <= 1;
+		  strobe <= 0;
+		  if(wtoo) begin
+			  cmem[2] `DATABITS <= wdata;
+			  cmem[2] `DIRTYBIT <= 1;
+			  ccstrobe <= 1;
+			  ccaddr <= addr;
+			  ccwdata <= wdata;
+		  end
+		end else if(cmem[3] `ADDRBITS == addr) begin
+		  rdata <= cmem[3] `DATABITS;
+		  cmem[3] `TIMEBIT <= 1;
+		  strobe <= 0;
+		  if(wtoo) begin
+			  cmem[3] `DATABITS <= wdata;
+			  cmem[3] `DIRTYBIT <= 1;
+			  ccstrobe <= 1;
+			  ccaddr <= addr;
+			  ccwdata <= wdata;
+		  end
+		end else if(cmem[4] `ADDRBITS == addr) begin
+		  rdata <= cmem[4] `DATABITS;
+		  cmem[4] `TIMEBIT <= 1;
+		  strobe <= 0;
+		  if(wtoo) begin
+			  cmem[4] `DATABITS <= wdata;
+			  cmem[4] `DIRTYBIT <= 1;
+			  ccstrobe <= 1;
+			  ccaddr <= addr;
+			  ccwdata <= wdata;
+		  end
+		end else if(cmem[5] `ADDRBITS == addr) begin
+		  rdata <= cmem[5] `DATABITS;
+		  cmem[5] `TIMEBIT <= 1;
+		  strobe <= 0;
+		  if(wtoo) begin
+			  cmem[5] `DATABITS <= wdata;
+			  cmem[5] `DIRTYBIT <= 1;
+			  ccstrobe <= 1;
+			  ccaddr <= addr;
+			  ccwdata <= wdata;
+		  end
+		end else if(cmem[6] `ADDRBITS == addr) begin
+		  rdata <= cmem[6] `DATABITS;
+		  cmem[6] `TIMEBIT <= 1;
+		  strobe <= 0;
+		  if(wtoo) begin
+			  cmem[6] `DATABITS <= wdata;
+			  cmem[6] `DIRTYBIT <= 1;
+			  ccstrobe <= 1;
+			  ccaddr <= addr;
+			  ccwdata <= wdata;
+		  end
+		end else if(cmem[7] `ADDRBITS == addr) begin
+		  rdata <= cmem[7] `DATABITS;
+		  cmem[7] `TIMEBIT <= 1;
+		  strobe <= 0;
+		  if(wtoo) begin
+			  cmem[7] `DATABITS <= wdata;
+			  cmem[7] `DIRTYBIT <= 1;
+			  ccstrobe <= 1;
+			  ccaddr <= addr;
+			  ccwdata <= wdata;
+		  end
+		end else begin //Cache Miss
+		end
+
+	end
 end
 
 //Other cache coherency updates
