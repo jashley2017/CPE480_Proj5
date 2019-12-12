@@ -109,6 +109,10 @@ wire ccupdatedone0, ccupdatedone1;
 wire ccmiss0, ccmiss1;
 wire in_tr0, in_tr1;
 wire stall0, stall1;
+wire smwrite0, smwrite1;
+wire smupdate0, smupdate1;
+wire fetching;
+wire whichcache;
 
 slowmem16 DATAMEM(rdy, rdata, addr, wdata, wtoo, strobe, clk);
 
@@ -116,13 +120,72 @@ core PE0(halt0, reset, clk, rdata0, addr0, wdata0, wtoo0, strobe0, in_tr0, stall
 cache C0(reset, rdata0, addr0, wdata0, wtoo0, strobe0, clk, in_tr0,
 ccstrobe0, ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0, ccwdata0, ccstrobe1,
 ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, stall0, smstrobe0,
-smrdata0, smaddr0, smwdata0);
+smwrite0, smupdate0, smrdata0, smaddr0, smwdata0);
 
 core PE1(halt1, reset, clk, rdata1, addr1, wdata1, wtoo1, strobe1, in_tr1, stall1);
 cache C1(reset, rdata1, addr1, wdata1, wtoo1, strobe1, clk, in_tr1,
 ccstrobe1, ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, ccstrobe0,
 ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0, ccwdata0, stall1, smstrobe1,
-smrdata1, smaddr1, smwdata1);
+smwrite1, smupdate1, smrdata1, smaddr1, smwdata1);
+
+//Strobe resolver
+always @(posedge clk) begin
+  if(strobe) begin
+	  strobe <= 0;
+	end
+	if(strobe0) begin
+	  strobe0 <= 0;
+	end
+	if(strobe1) begin
+	  strobe1 <= 0;
+	end
+	if(smupdate0) begin
+	  smupdate0 <= 0;
+	end
+	if(smupdate1) begin
+    smupdate1 <= 0;
+	end
+end
+
+//Arbitration logic for slow memory fetches
+always @(posedge clk) begin
+  if(!fetching) begin
+	  //Always prioritize cache0 requests
+	  if(smstrobe0) begin
+		  addr <= smaddr0;
+			strobe <= 1;
+			fetching <= 1;
+			whichcache <= 0;
+			if(smwrite0) begin
+			  wdata <= smwdata0;
+				wtoo <= 1;
+			end else begin
+			  wtoo <= 0;
+			end
+		end else if(smstrobe1) begin
+		  addr <= smaddr1;
+			strobe <= 1;
+			fetching <= 1;
+			whichcache <= 1;
+			if(smwrite1) begin
+			  wdata <= smwdata1;
+				wtoo <= 1;
+			end else begin
+			  wtoo <= 0;
+			end
+	end else if(rdy) begin
+	  fetching <= 0;
+		if(!whichcache) begin
+		  smupdate0 <= 1;
+			smrdata0 <= rdata;
+			rdata0 <= rdata;
+		end else begin
+		  smupdate1 <= 1;
+			smrdata1 <= rdata;
+			rdata1 <= rdata;
+		end
+	end
+end
 endmodule
 
 module slowmem16 (rdy, rdata, addr, wdata, wtoo, strobe, clk);
@@ -166,7 +229,7 @@ endmodule
 module cache (reset, rdata, addr, wdata, wtoo, strobe, clk,
 in_tr, ccstrobe, ccupdate, ccupdatedone, ccmiss, ccrdata, ccaddr, ccwdata, occstrobe,
 occupdate, occupdatedone, occmiss, occrdata, occaddr, occwdata, stall, smstrobe,
-smwrite, smrdata, smaddr, smwdata);
+smwrite, smupdate, smrdata, smaddr, smwdata);
 input reset;
 
 // Basic cache connections
@@ -199,6 +262,7 @@ output stall; //Should my core stall?
 // Slow memory connections
 inout smstrobe; //Slow memory enable
 output smwrite; //Slow memory write
+input smupdate; //Slow memory update
 input `LINE smrdata; //Slow memory read data
 inout `LINEADDR smaddr; //Slow memory address
 output `LINE smwdata; //Slow memory write data
@@ -457,6 +521,7 @@ always @(posedge clk) begin
 		else begin occmiss <= 1; end
 	end
 end
+
 //Finished checking other cache
 always @(posedge clk) begin
   if(ccupdatedone) begin
@@ -486,6 +551,20 @@ always @(posedge clk) begin
 		    cmem[7] `DATABITS <= ccrdata; rdata <= ccrdata; end
 			stall <= 0;
 	  end
+	end
+end
+
+//Finished retrieving from slow memory
+always @(posedge clk) begin
+  if(smupdate) begin
+	  if(cmem[0] `ADDRBITS == smaddr) begin cmem[0] `DATABITS <= smrdata; end
+		else if(cmem[1] `ADDRBITS == smaddr) begin cmem[1] `DATABITS <= smrdata; end
+		else if(cmem[2] `ADDRBITS == smaddr) begin cmem[2] `DATABITS <= smrdata; end
+		else if(cmem[3] `ADDRBITS == smaddr) begin cmem[3] `DATABITS <= smrdata; end
+		else if(cmem[4] `ADDRBITS == smaddr) begin cmem[4] `DATABITS <= smrdata; end
+		else if(cmem[5] `ADDRBITS == smaddr) begin cmem[5] `DATABITS <= smrdata; end
+		else if(cmem[6] `ADDRBITS == smaddr) begin cmem[6] `DATABITS <= smrdata; end
+		else if(cmem[7] `ADDRBITS == smaddr) begin cmem[7] `DATABITS <= smrdata; end
 	end
 end
 
