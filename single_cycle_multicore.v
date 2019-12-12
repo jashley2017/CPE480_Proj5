@@ -162,18 +162,20 @@ endmodule
 module cache (rdata, addr, wdata, wtoo, strobe, clk,
 in_tr, ccstrobe, ccupdate, ccrdata, ccaddr, ccwdata,
 occstrobe, occaddr, occwdata, stall);
-output reg `LINE rdata;
-output `LINE ccwdata;
-output stall;
-inout ccupdate;
-inout `LINEADDR ccaddr;
-input `LINEADDR addr;
-input `LINE wdata;
-input wtoo, strobe, clk, in_tr, ccstrobe;
-input `LINE ccrdata;
-input occstrobe;
-input `LINEADDR occaddr;
-input `LINE occwdata;
+output reg `LINE rdata; //Read data
+output `LINE ccwdata; //Cache coherency write data
+output stall; //Should my core stall?
+inout ccupdate; //Cache miss looking at other cache
+inout `LINEADDR ccaddr; //Cache coherency address
+input `LINEADDR addr; //Address
+input `LINE wdata; //Write data
+input wtoo, strobe, clk;
+input in_tr; //Is my core in transaction?
+input ccstrobe; //Cache coherency enable
+input `LINE ccrdata; //Cache coherency read data
+input occstrobe; //Is the other cache updating me?
+input `LINEADDR occaddr; //Other cache coherency address
+input `LINE occwdata; //Other cache coherency write data
 reg `CLINE cmem `CLINES; //Cache memory
 reg `CPTR cindex; //Current number of cache lines
 wire timereset; //Checks if all time bits are 1
