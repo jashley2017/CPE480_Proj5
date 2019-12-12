@@ -98,27 +98,31 @@ output reg halt;
 input reset, clk;
 
 wire rdy;
-reg `LINE rdata, rdata0, rdata1, ccrdata0, ccrdata1;
-reg `LINE wdata, wdata0, wdata1, ccwdata0, ccwdata1;
-reg `LINEADDR addr, addr0, addr1, ccaddr0, ccaddr1;
+reg `LINE rdata, rdata0, rdata1, ccrdata0, ccrdata1, smrdata0, smrdata1;
+reg `LINE wdata, wdata0, wdata1, ccwdata0, ccwdata1, smwdata0, smwdata1;
+reg `LINEADDR addr, addr0, addr1, ccaddr0, ccaddr1, smaddr0, smaddr1;
 wire wtoo, wtoo0, wtoo1;
 wire strobe, strobe0, strobe1;
-wire ccstrobe0, ccstrobe1;
+wire ccstrobe0, ccstrobe1, smstrobe0, smstrobe1;
 wire ccupdate0, ccupdate1;
+wire ccupdatedone0, ccupdatedone1;
+wire ccmiss0, ccmiss1;
 wire in_tr0, in_tr1;
 wire stall0, stall1;
 
 slowmem16 DATAMEM(rdy, rdata, addr, wdata, wtoo, strobe, clk);
 
 core PE0(halt0, reset, clk, rdata0, addr0, wdata0, wtoo0, strobe0, in_tr0, stall0);
-cache C0(rdata0, addr0, wdata0, wtoo0, strobe0, clk, in_tr0,
-ccstrobe0, ccupdate0, ccrdata0, ccaddr0, ccwdata0,
-ccstrobe1, ccaddr1, ccwdata1, stall0);
+cache C0(reset, rdata0, addr0, wdata0, wtoo0, strobe0, clk, in_tr0,
+ccstrobe0, ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0, ccwdata0, ccstrobe1,
+ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, stall0, smstrobe0,
+smrdata0, smaddr0, smwdata0);
 
 core PE1(halt1, reset, clk, rdata1, addr1, wdata1, wtoo1, strobe1, in_tr1, stall1);
-cache C1(rdata1, addr1, wdata1, wtoo1, strobe1, clk, in_tr1,
-ccstrobe1, ccupdate1, ccrdata1, ccaddr1, ccwdata1,
-ccstrobe0, ccaddr0, ccwdata0, stall1);
+cache C1(reset, rdata1, addr1, wdata1, wtoo1, strobe1, clk, in_tr1,
+ccstrobe1, ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, ccstrobe0,
+ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0, ccwdata0, stall1, smstrobe1,
+smrdata1, smaddr1, smwdata1);
 endmodule
 
 module slowmem16 (rdy, rdata, addr, wdata, wtoo, strobe, clk);
@@ -159,30 +163,63 @@ always @(posedge clk) begin
 end
 endmodule
 
-module cache (rdata, addr, wdata, wtoo, strobe, clk,
-in_tr, ccstrobe, ccupdate, ccrdata, ccaddr, ccwdata,
-occstrobe, occaddr, occwdata, stall);
+module cache (reset, rdata, addr, wdata, wtoo, strobe, clk,
+in_tr, ccstrobe, ccupdate, ccupdatedone, ccmiss, ccrdata, ccaddr, ccwdata, occstrobe,
+occupdate, occupdatedone, occmiss, occrdata, occaddr, occwdata, stall, smstrobe,
+smwrite, smrdata, smaddr, smwdata);
+input reset;
+
+// Basic cache connections
 output reg `LINE rdata; //Read data
-output `LINE ccwdata; //Cache coherency write data
-output stall; //Should my core stall?
-inout ccupdate; //Cache miss looking at other cache
-inout `LINEADDR ccaddr; //Cache coherency address
 input `LINEADDR addr; //Address
 input `LINE wdata; //Write data
 input wtoo, strobe, clk;
 input in_tr; //Is my core in transaction?
-input ccstrobe; //Cache coherency enable
+
+// Cache coherency connections
+inout ccstrobe; //Cache coherency enable
+inout ccupdate; //Cache miss looking at other cache
+inout ccupdatedone; //Did the other cache finish fetching?
+input ccmiss; //Cache coherency miss
 input `LINE ccrdata; //Cache coherency read data
-input occstrobe; //Is the other cache updating me?
+inout `LINEADDR ccaddr; //Cache coherency address
+output `LINE ccwdata; //Cache coherency write data
+
+// Other cache coherency connections
+inout occstrobe; //Is the other cache updating me?
+inout occupdate; //Is the other cache fetching data?
+inout occupdatedone; //Am I done fetching data?
+output occmiss; //Other cache coherency miss
+output `LINE occrdata; //Other cache coherency read data
 input `LINEADDR occaddr; //Other cache coherency address
 input `LINE occwdata; //Other cache coherency write data
+
+output stall; //Should my core stall?
+
+// Slow memory connections
+inout smstrobe; //Slow memory enable
+output smwrite; //Slow memory write
+input `LINE smrdata; //Slow memory read data
+inout `LINEADDR smaddr; //Slow memory address
+output `LINE smwdata; //Slow memory write data
+
 reg `CLINE cmem `CLINES; //Cache memory
 reg `CPTR cindex; //Current number of cache lines
 wire timereset; //Checks if all time bits are 1
+wire cachefull; //Checks if cache is full
 
 assign timereset = (cmem[0] `DIRTYBIT) && (cmem[1] `DIRTYBIT) && (cmem[2] `DIRTYBIT)
 && (cmem[3] `DIRTYBIT) && (cmem[4] `DIRTYBIT) && (cmem[5] `DIRTYBIT)
 && (cmem[6] `DIRTYBIT) && (cmem[7] `DIRTYBIT);
+
+assign cachefull = (cmem[0] != 0) && (cmem[1] != 0) && (cmem[2] != 0)
+&& (cmem[3] != 0) && (cmem[4] != 0) && (cmem[5] != 0) && (cmem[6] != 0)
+&& (cmem[7] != 0);
+
+//Reset
+always @(reset) begin
+  cindex <= 0;
+end
 
 //Cache retrieval
 always @(posedge clk) begin
@@ -276,8 +313,109 @@ always @(posedge clk) begin
 			  ccwdata <= wdata;
 		  end
 		end else begin //Cache Miss
+		  //Clear cache line if cache is full
+      if(cachefull) begin
+			  if(cmem[0] `TIMEBIT == 0) begin
+				  if(cmem[0] `DIRTYBIT) begin
+					  smaddr <= cmem[0] `ADDRBITS;
+					  smwdata <= cmem[0] `DATABITS;
+					  smstrobe <= 1;
+						smwrite <= 1;
+					end
+					cmem[0] `ADDRBITS <= addr;
+					cmem[0] `DATABITS <= 0;
+					cmem[0] `DIRTYBIT <= 0;
+					cmem[0] `TIMEBIT <= 1;
+				end else if(cmem[1] `TIMEBIT == 0) begin
+				  if(cmem[1] `DIRTYBIT) begin
+					  smaddr <= cmem[1] `ADDRBITS;
+					  smwdata <= cmem[1] `DATABITS;
+					  smstrobe <= 1;
+						smwrite <= 1;
+					end
+					cmem[1] `ADDRBITS <= addr;
+					cmem[1] `DATABITS <= 0;
+					cmem[1] `DIRTYBIT <= 0;
+					cmem[1] `TIMEBIT <= 1;
+				end else if(cmem[2] `TIMEBIT == 0) begin
+				  if(cmem[2] `DIRTYBIT) begin
+					  smaddr <= cmem[2] `ADDRBITS;
+					  smwdata <= cmem[2] `DATABITS;
+					  smstrobe <= 1;
+						smwrite <= 1;
+					end
+					cmem[2] `ADDRBITS <= addr;
+					cmem[2] `DATABITS <= 0;
+					cmem[2] `DIRTYBIT <= 0;
+					cmem[2] `TIMEBIT <= 1;
+				end else if(cmem[3] `TIMEBIT == 0) begin
+				  if(cmem[3] `DIRTYBIT) begin
+					  smaddr <= cmem[3] `ADDRBITS;
+					  smwdata <= cmem[3] `DATABITS;
+					  smstrobe <= 1;
+						smwrite <= 1;
+					end
+					cmem[3] `ADDRBITS <= addr;
+					cmem[3] `DATABITS <= 0;
+					cmem[3] `DIRTYBIT <= 0;
+					cmem[3] `TIMEBIT <= 1;
+				end else if(cmem[4] `TIMEBIT == 0) begin
+				  if(cmem[4] `DIRTYBIT) begin
+					  smaddr <= cmem[4] `ADDRBITS;
+					  smwdata <= cmem[4] `DATABITS;
+					  smstrobe <= 1;
+						smwrite <= 1;
+					end
+					cmem[4] `ADDRBITS <= addr;
+					cmem[4] `DATABITS <= 0;
+					cmem[4] `DIRTYBIT <= 0;
+					cmem[4] `TIMEBIT <= 1;
+				end else if(cmem[5] `TIMEBIT == 0) begin
+				  if(cmem[5] `DIRTYBIT) begin
+					  smaddr <= cmem[5] `ADDRBITS;
+					  smwdata <= cmem[5] `DATABITS;
+					  smstrobe <= 1;
+						smwrite <= 1;
+					end
+					cmem[5] `ADDRBITS <= addr;
+					cmem[5] `DATABITS <= 0;
+					cmem[5] `DIRTYBIT <= 0;
+					cmem[5] `TIMEBIT <= 1;
+				end else if(cmem[6] `TIMEBIT == 0) begin
+				  if(cmem[6] `DIRTYBIT) begin
+					  smaddr <= cmem[6] `ADDRBITS;
+					  smwdata <= cmem[6] `DATABITS;
+					  smstrobe <= 1;
+						smwrite <= 1;
+					end
+					cmem[6] `ADDRBITS <= addr;
+					cmem[6] `DATABITS <= 0;
+					cmem[6] `DIRTYBIT <= 0;
+					cmem[6] `TIMEBIT <= 1;
+				end else if(cmem[7] `TIMEBIT == 0) begin
+				  if(cmem[7] `DIRTYBIT) begin
+					  smaddr <= cmem[7] `ADDRBITS;
+					  smwdata <= cmem[7] `DATABITS;
+					  smstrobe <= 1;
+						smwrite <= 1;
+					end
+					cmem[7] `ADDRBITS <= addr;
+					cmem[7] `DATABITS <= 0;
+					cmem[7] `DIRTYBIT <= 0;
+					cmem[7] `TIMEBIT <= 1;
+				end
+			end else begin
+			  //Cache not full, append to end
+				cmem[cindex] `ADDRBITS <= addr;
+				cmem[cindex] `DATABITS <= 0;
+				cmem[cindex] `DIRTYBIT <= 0;
+				cmem[cindex] `TIMEBIT <= 1;
+				cindex <= cindex + 1;
+			end
+			//Check other cache for data
+		  ccupdate <= 1;
+			ccaddr <= addr;
 		end
-
 	end
 end
 
@@ -285,43 +423,69 @@ end
 always @(posedge clk) begin
   if(occstrobe) begin
 	  if(cmem[0] `ADDRBITS == occaddr) begin
-		  cmem[0] `DATABITS <= occwdata; cmem[0] `DIRTYBIT <= 1; cmem[0] `TIMEBIT <= 1; end
+		  cmem[0] `DATABITS <= occwdata; cmem[0] `DIRTYBIT <= 1; end
 		else if(cmem[1] `ADDRBITS == occaddr) begin
-			cmem[1] `DATABITS <= occwdata; cmem[1] `DIRTYBIT <= 1; cmem[1] `TIMEBIT <= 1; end
+			cmem[1] `DATABITS <= occwdata; cmem[1] `DIRTYBIT <= 1; end
 		else if(cmem[2] `ADDRBITS == occaddr) begin
-		  cmem[2] `DATABITS <= occwdata; cmem[2] `DIRTYBIT <= 1; cmem[2] `TIMEBIT <= 1; end
+		  cmem[2] `DATABITS <= occwdata; cmem[2] `DIRTYBIT <= 1; end
 		else if(cmem[3] `ADDRBITS == occaddr) begin
-		  cmem[3] `DATABITS <= occwdata; cmem[3] `DIRTYBIT <= 1; cmem[3] `TIMEBIT <= 1; end
+		  cmem[3] `DATABITS <= occwdata; cmem[3] `DIRTYBIT <= 1; end
 		else if(cmem[4] `ADDRBITS == occaddr) begin
-		  cmem[4] `DATABITS <= occwdata; cmem[4] `DIRTYBIT <= 1; cmem[4] `TIMEBIT <= 1; end
+		  cmem[4] `DATABITS <= occwdata; cmem[4] `DIRTYBIT <= 1; end
 		else if(cmem[5] `ADDRBITS == occaddr) begin
-		  cmem[5] `DATABITS <= occwdata; cmem[5] `DIRTYBIT <= 1; cmem[5] `TIMEBIT <= 1; end
+		  cmem[5] `DATABITS <= occwdata; cmem[5] `DIRTYBIT <= 1; end
 		else if(cmem[6] `ADDRBITS == occaddr) begin
-		  cmem[6] `DATABITS <= occwdata; cmem[6] `DIRTYBIT <= 1; cmem[6] `TIMEBIT <= 1; end
+		  cmem[6] `DATABITS <= occwdata; cmem[6] `DIRTYBIT <= 1; end
 		else if(cmem[7] `ADDRBITS == occaddr) begin
-		  cmem[7] `DATABITS <= occwdata; cmem[7] `DIRTYBIT <= 1; cmem[7] `TIMEBIT <= 1; end
+		  cmem[7] `DATABITS <= occwdata; cmem[7] `DIRTYBIT <= 1; end
 	end
 end
 
-//Miss but in other cache
+//Other cache is requesting data
 always @(posedge clk) begin
-  if(ccupdate) begin
-		if(cmem[0] `ADDRBITS == ccaddr) begin
-		  cmem[0] `DATABITS <= ccrdata; rdata <= ccrdata; end
-		else if(cmem[1] `ADDRBITS == ccaddr) begin
-		  cmem[1] `DATABITS <= ccrdata; rdata <= ccrdata; end
-		else if(cmem[2] `ADDRBITS == ccaddr) begin
-		  cmem[2] `DATABITS <= ccrdata; rdata <= ccrdata; end
-		else if(cmem[3] `ADDRBITS == ccaddr) begin
-		  cmem[3] `DATABITS <= ccrdata; rdata <= ccrdata; end
-		else if(cmem[4] `ADDRBITS == ccaddr) begin
-		  cmem[4] `DATABITS <= ccrdata; rdata <= ccrdata; end
-		else if(cmem[5] `ADDRBITS == ccaddr) begin
-		  cmem[5] `DATABITS <= ccrdata; rdata <= ccrdata; end
-		else if(cmem[6] `ADDRBITS == ccaddr) begin
-		  cmem[6] `DATABITS <= ccrdata; rdata <= ccrdata; end
-		else if(cmem[7] `ADDRBITS == ccaddr) begin
-		  cmem[7] `DATABITS <= ccrdata; rdata <= ccrdata; end
+  if(occupdate) begin
+    occupdate <= 0;
+		occupdatedone <= 1;
+    if(cmem[0] `ADDRBITS == occaddr) begin ccrdata <= cmem[0] `DATABITS; end
+		else if(cmem[1] `ADDRBITS == occaddr) begin ccrdata <= cmem[1] `DATABITS; end
+		else if(cmem[2] `ADDRBITS == occaddr) begin ccrdata <= cmem[2] `DATABITS; end
+		else if(cmem[3] `ADDRBITS == occaddr) begin ccrdata <= cmem[3] `DATABITS; end
+		else if(cmem[4] `ADDRBITS == occaddr) begin ccrdata <= cmem[4] `DATABITS; end
+		else if(cmem[5] `ADDRBITS == occaddr) begin ccrdata <= cmem[5] `DATABITS; end
+		else if(cmem[6] `ADDRBITS == occaddr) begin ccrdata <= cmem[6] `DATABITS; end
+		else if(cmem[7] `ADDRBITS == occaddr) begin ccrdata <= cmem[7] `DATABITS; end
+		else begin occmiss <= 1; end
+	end
+end
+//Finished checking other cache
+always @(posedge clk) begin
+  if(ccupdatedone) begin
+	  ccupdatedone <= 0;
+		if(occmiss) begin
+      //Data not found in other cache, grab from slow memory
+      smaddr <= addr;
+			smstrobe <= 1;
+			smwrite <= 0;
+		end else begin
+      //Found data in other cache
+		  if(cmem[0] `ADDRBITS == ccaddr) begin
+		    cmem[0] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		  else if(cmem[1] `ADDRBITS == ccaddr) begin
+		    cmem[1] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		  else if(cmem[2] `ADDRBITS == ccaddr) begin
+		    cmem[2] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		  else if(cmem[3] `ADDRBITS == ccaddr) begin
+		    cmem[3] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		  else if(cmem[4] `ADDRBITS == ccaddr) begin
+		    cmem[4] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		  else if(cmem[5] `ADDRBITS == ccaddr) begin
+		    cmem[5] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		  else if(cmem[6] `ADDRBITS == ccaddr) begin
+		    cmem[6] `DATABITS <= ccrdata; rdata <= ccrdata; end
+		  else if(cmem[7] `ADDRBITS == ccaddr) begin
+		    cmem[7] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			stall <= 0;
+	  end
 	end
 end
 
