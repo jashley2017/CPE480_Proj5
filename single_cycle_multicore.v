@@ -128,6 +128,13 @@ ccstrobe1, ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, ccstr
 ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0, ccwdata0, stall1, smstrobe1,
 smwrite1, smupdate1, smrdata1, smaddr1, smwdata1);
 
+//Halting logic
+always @(posedge clk) begin
+  if(halt0 && halt1) begin
+	  halt <= 1;
+	end
+end
+
 //Strobe resolver
 always @(posedge clk) begin
   if(strobe) begin
@@ -288,7 +295,8 @@ end
 //Cache retrieval
 always @(posedge clk) begin
   if(strobe) begin
-	  if(cmem[0] `ADDRBITS == addr) begin //Cache Hit
+	  //Cache Hit
+	  if(cmem[0] `ADDRBITS == addr) begin
 		  rdata <= cmem[0] `DATABITS;
 			cmem[0] `TIMEBIT <= 1;
 			strobe <= 0;
@@ -476,7 +484,8 @@ always @(posedge clk) begin
 				cmem[cindex] `TIMEBIT <= 1;
 				cindex <= cindex + 1;
 			end
-			//Check other cache for data
+			//Stall and check other cache for data
+			stall = 1;
 		  ccupdate <= 1;
 			ccaddr <= addr;
 		end
@@ -526,7 +535,7 @@ end
 always @(posedge clk) begin
   if(ccupdatedone) begin
 	  ccupdatedone <= 0;
-		if(occmiss) begin
+		if(ccmiss) begin
       //Data not found in other cache, grab from slow memory
       smaddr <= addr;
 			smstrobe <= 1;
@@ -549,6 +558,7 @@ always @(posedge clk) begin
 		    cmem[6] `DATABITS <= ccrdata; rdata <= ccrdata; end
 		  else if(cmem[7] `ADDRBITS == ccaddr) begin
 		    cmem[7] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			//Unstall core
 			stall <= 0;
 	  end
 	end
@@ -566,6 +576,8 @@ always @(posedge clk) begin
 		else if(cmem[6] `ADDRBITS == smaddr) begin cmem[6] `DATABITS <= smrdata; end
 		else if(cmem[7] `ADDRBITS == smaddr) begin cmem[7] `DATABITS <= smrdata; end
 	end
+	//Unstall core
+	stall <= 0;
 end
 
 //Clear timebits
