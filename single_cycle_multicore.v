@@ -556,7 +556,7 @@ always @(posedge clk) begin
 			end
 		  else if(cmem[4] `ADDRBITS == ccaddr) begin
 			  if(wtoo) begin cmem[4] `DATABITS <= wdata; end
-		    else begin cmem[4] `DATABITS <= ccrdata; end
+		                else begin cmem[4] `DATABITS <= ccrdata; end
 				rdata <= ccrdata;
 			end
 		  else if(cmem[5] `ADDRBITS == ccaddr) begin
