@@ -299,7 +299,6 @@ always @(posedge clk) begin
 	  if(cmem[0] `ADDRBITS == addr) begin
 		  rdata <= cmem[0] `DATABITS;
 			cmem[0] `TIMEBIT <= 1;
-			strobe <= 0;
 			if(wtoo) begin
 			  cmem[0] `DATABITS <= wdata;
 				cmem[0] `DIRTYBIT <= 1;
@@ -310,7 +309,6 @@ always @(posedge clk) begin
 		end else if(cmem[1] `ADDRBITS == addr) begin
 		  rdata <= cmem[1] `DATABITS;
 		  cmem[1] `TIMEBIT <= 1;
-		  strobe <= 0;
 		  if(wtoo) begin
 			  cmem[1] `DATABITS <= wdata;
 			  cmem[1] `DIRTYBIT <= 1;
@@ -321,7 +319,6 @@ always @(posedge clk) begin
     end else if(cmem[2] `ADDRBITS == addr) begin
 		  rdata <= cmem[2] `DATABITS;
 		  cmem[2] `TIMEBIT <= 1;
-		  strobe <= 0;
 		  if(wtoo) begin
 			  cmem[2] `DATABITS <= wdata;
 			  cmem[2] `DIRTYBIT <= 1;
@@ -332,7 +329,6 @@ always @(posedge clk) begin
 		end else if(cmem[3] `ADDRBITS == addr) begin
 		  rdata <= cmem[3] `DATABITS;
 		  cmem[3] `TIMEBIT <= 1;
-		  strobe <= 0;
 		  if(wtoo) begin
 			  cmem[3] `DATABITS <= wdata;
 			  cmem[3] `DIRTYBIT <= 1;
@@ -343,7 +339,6 @@ always @(posedge clk) begin
 		end else if(cmem[4] `ADDRBITS == addr) begin
 		  rdata <= cmem[4] `DATABITS;
 		  cmem[4] `TIMEBIT <= 1;
-		  strobe <= 0;
 		  if(wtoo) begin
 			  cmem[4] `DATABITS <= wdata;
 			  cmem[4] `DIRTYBIT <= 1;
@@ -354,7 +349,6 @@ always @(posedge clk) begin
 		end else if(cmem[5] `ADDRBITS == addr) begin
 		  rdata <= cmem[5] `DATABITS;
 		  cmem[5] `TIMEBIT <= 1;
-		  strobe <= 0;
 		  if(wtoo) begin
 			  cmem[5] `DATABITS <= wdata;
 			  cmem[5] `DIRTYBIT <= 1;
@@ -365,7 +359,6 @@ always @(posedge clk) begin
 		end else if(cmem[6] `ADDRBITS == addr) begin
 		  rdata <= cmem[6] `DATABITS;
 		  cmem[6] `TIMEBIT <= 1;
-		  strobe <= 0;
 		  if(wtoo) begin
 			  cmem[6] `DATABITS <= wdata;
 			  cmem[6] `DIRTYBIT <= 1;
@@ -376,7 +369,6 @@ always @(posedge clk) begin
 		end else if(cmem[7] `ADDRBITS == addr) begin
 		  rdata <= cmem[7] `DATABITS;
 		  cmem[7] `TIMEBIT <= 1;
-		  strobe <= 0;
 		  if(wtoo) begin
 			  cmem[7] `DATABITS <= wdata;
 			  cmem[7] `DIRTYBIT <= 1;
@@ -543,21 +535,45 @@ always @(posedge clk) begin
 		end else begin
       //Found data in other cache
 		  if(cmem[0] `ADDRBITS == ccaddr) begin
-		    cmem[0] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			  if(wtoo) begin cmem[0] `DATABITS <= wdata; end
+				else begin cmem[0] `DATABITS <= ccrdata; end
+				rdata <= ccrdata;
+			end
 		  else if(cmem[1] `ADDRBITS == ccaddr) begin
-		    cmem[1] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			  if(wtoo) begin cmem[1] `DATABITS <= wdata; end
+				else begin cmem[1] `DATABITS <= ccrdata; end
+				rdata <= ccrdata;
+		  end
 		  else if(cmem[2] `ADDRBITS == ccaddr) begin
-		    cmem[2] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			  if(wtoo) begin cmem[2] `DATABITS <= wdata; end
+				else begin cmem[2] `DATABITS <= ccrdata; end
+				rdata <= ccrdata;
+			end
 		  else if(cmem[3] `ADDRBITS == ccaddr) begin
-		    cmem[3] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			  if(wtoo) begin cmem[3] `DATABITS <= wdata; end
+				else begin cmem[3] `DATABITS <= ccrdata; end
+				rdata <= ccrdata;
+			end
 		  else if(cmem[4] `ADDRBITS == ccaddr) begin
-		    cmem[4] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			  if(wtoo) begin cmem[4] `DATABITS <= wdata; end
+		    else begin cmem[4] `DATABITS <= ccrdata; end
+				rdata <= ccrdata;
+			end
 		  else if(cmem[5] `ADDRBITS == ccaddr) begin
-		    cmem[5] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			  if(wtoo) begin cmem[5] `DATABITS <= wdata; end
+				else begin cmem[5] `DATABITS <= ccrdata; end
+				rdata <= ccrdata;
+			end
 		  else if(cmem[6] `ADDRBITS == ccaddr) begin
-		    cmem[6] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			  if(wtoo) begin cmem[6] `DATABITS <= wdata; end
+				else begin cmem[6] `DATABITS <= ccrdata; end
+				rdata <= ccrdata;
+			end
 		  else if(cmem[7] `ADDRBITS == ccaddr) begin
-		    cmem[7] `DATABITS <= ccrdata; rdata <= ccrdata; end
+			  if(wtoo) begin cmem[7] `DATABITS <= wdata; end
+				else begin cmem[7] `DATABITS <= ccrdata; end
+				rdata <= ccrdata;
+			end
 			//Unstall core
 			stall <= 0;
 	  end
@@ -567,14 +583,38 @@ end
 //Finished retrieving from slow memory
 always @(posedge clk) begin
   if(smupdate) begin
-	  if(cmem[0] `ADDRBITS == smaddr) begin cmem[0] `DATABITS <= smrdata; end
-		else if(cmem[1] `ADDRBITS == smaddr) begin cmem[1] `DATABITS <= smrdata; end
-		else if(cmem[2] `ADDRBITS == smaddr) begin cmem[2] `DATABITS <= smrdata; end
-		else if(cmem[3] `ADDRBITS == smaddr) begin cmem[3] `DATABITS <= smrdata; end
-		else if(cmem[4] `ADDRBITS == smaddr) begin cmem[4] `DATABITS <= smrdata; end
-		else if(cmem[5] `ADDRBITS == smaddr) begin cmem[5] `DATABITS <= smrdata; end
-		else if(cmem[6] `ADDRBITS == smaddr) begin cmem[6] `DATABITS <= smrdata; end
-		else if(cmem[7] `ADDRBITS == smaddr) begin cmem[7] `DATABITS <= smrdata; end
+	  if(cmem[0] `ADDRBITS == smaddr) begin
+		  if(wtoo) begin cmem[0] `DATABITS <= wdata; end
+			else begin cmem[0] `DATABITS <= smrdata; end
+		end
+		else if(cmem[1] `ADDRBITS == smaddr) begin
+		  if(wtoo) begin cmem[1] `DATABITS <= wdata; end
+			else begin cmem[1] `DATABITS <= smrdata; end
+		end
+		else if(cmem[2] `ADDRBITS == smaddr) begin
+		  if(wtoo) begin cmem[2] `DATABITS <= wdata; end
+			else begin cmem[2] `DATABITS <= smrdata; end
+		end
+		else if(cmem[3] `ADDRBITS == smaddr) begin
+		  if(wtoo) begin cmem[3] `DATABITS <= wdata; end
+			else begin cmem[3] `DATABITS <= smrdata; end
+		end
+		else if(cmem[4] `ADDRBITS == smaddr) begin
+		  if(wtoo) begin cmem[4] `DATABITS <= wdata; end
+			else begin cmem[4] `DATABITS <= smrdata; end
+		end
+		else if(cmem[5] `ADDRBITS == smaddr) begin
+		  if(wtoo) begin cmem[5] `DATABITS <= wdata; end
+			else begin cmem[5] `DATABITS <= smrdata; end
+		end
+		else if(cmem[6] `ADDRBITS == smaddr) begin
+		  if(wtoo) begin cmem[6] `DATABITS <= wdata; end
+			else begin cmem[6] `DATABITS <= smrdata; end
+		end
+		else if(cmem[7] `ADDRBITS == smaddr) begin
+		  if(wtoo) begin cmem[7] `DATABITS <= wdata; end
+			else begin cmem[7] `DATABITS <= smrdata; end
+		end
 	end
 	//Unstall core
 	stall <= 0;
