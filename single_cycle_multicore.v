@@ -64,6 +64,12 @@
 `define LINES [65535:0]
 `define MEMDELAY 4
 
+//Mask identifier - Added by Praneeth
+`define SIGILL 4'b0001
+`define SIGTMV 4'b0010
+`define SIGCHK 4'b0100
+`define SIGLEX 4'b1000
+
 // cache definitions
 `define CLINE [33:0]
 `define CLINES [7:0]
@@ -122,7 +128,7 @@ assign sig_tmv = sig_tmv1 | sig_tmv0;
 
 // TODO: David, here are examples of how to fix wire, reg problems
 // wire clocked assignment
-reg smupdate1_reg; 
+reg smupdate1_reg;
 assign smupdate1 = smupdate1_reg;
 reg smupdate0_reg;
 assign smupdate0 = smupdate0_reg;
@@ -668,7 +674,6 @@ always @(posedge clk) begin
 			smwrite_reg <= 0;
 		end else begin
       sig_tmv_reg <= (in_tr & (wtoo | ccdatadirty)); 
-      //TODO: shouldnt this be occrdata? 
       //Found data in other cache
 		  if(cmem[0] `ADDRBITS == ccaddr) begin
 			  if(wtoo) begin cmem[0] `DATABITS <= wdata; end
@@ -865,6 +870,9 @@ assign s1src = (s1ir `IOPLEN == 0)
 		// only sign extend long instructions if immediate
 		: ((s1typ == `ILTypeImm) ? {{12{s1ir `IL_SRCS}}, s1ir `IL_SRC} : s1ir `IL_SRC);
 
+assign in_tr = (s1op == `OPjerr || s1op == `OPfail) ? 1:0;                    //added by praneeth
+assign in_tr = (s1op == `OPcom)? 0 : in_tr;
+
 // Stage 2: Read registers
 assign s2blocked =
 	// Block until dst register isn't being written to later in the pipeline
@@ -899,7 +907,8 @@ always @(posedge clk) begin
 			`ILTypeImm: s2src <= s1src;
 			// 4 bit wrapping offset for undo stack
 			`ILTypeUnd: s2src <= u[s2undidx];
-			`ILTypeReg, `ILTypeMem: s2src <= r[s1src];
+//			`ILTypeReg, `ILTypeMem: s2src <= r[s1src];
+			`ILTypeReg, `ILTypeMem: address <= s1src; strobe<=1;       //Added by Praneeth
 		endcase
 		s2dst <= r[s1dst];
 		s2dstreg <= s1dst;
