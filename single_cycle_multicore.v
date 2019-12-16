@@ -64,6 +64,12 @@
 `define LINES [65535:0]
 `define MEMDELAY 4
 
+//Mask identifier - Added by Praneeth
+`define SIGILL 4'b0001
+`define SIGTMV 4'b0010
+`define SIGCHK 4'b0100
+`define SIGLEX 4'b1000
+
 // cache definitions
 `define CLINE [33:0]
 `define CLINES [7:0]
@@ -122,7 +128,7 @@ assign sig_tmv = sig_tmv1 | sig_tmv0;
 
 // TODO: David, here are examples of how to fix wire, reg problems
 // wire clocked assignment
-reg smupdate1_reg; 
+reg smupdate1_reg;
 assign smupdate1 = smupdate1_reg;
 reg smupdate0_reg;
 assign smupdate0 = smupdate0_reg;
@@ -544,77 +550,77 @@ always @(posedge clk) begin
   if(occupdate) begin
     occupdate <= 0;
 		occupdatedone <= 1;
-    if(cmem[0] `ADDRBITS == occaddr) begin 
-      ccrdata <= cmem[0] `DATABITS; 
+    if(cmem[0] `ADDRBITS == occaddr) begin
+      ccrdata <= cmem[0] `DATABITS;
       // if this data has been accessed within our transaction, we want to
       // stop others from touching it.
       sig_tmv <= (in_tr & (cmem[0] `DIRTYBIT | cmem[0] `TIMEBIT));
       // send the dirty bit over as well so that the other cache can
-      // comprehend if it is also in transaction 
-      ccdatadirty <= cmem[0] `DIRTYBIT; 
+      // comprehend if it is also in transaction
+      ccdatadirty <= cmem[0] `DIRTYBIT;
     end
-		else if(cmem[1] `ADDRBITS == occaddr) begin 
-      ccrdata <= cmem[1] `DATABITS; 
+		else if(cmem[1] `ADDRBITS == occaddr) begin
+      ccrdata <= cmem[1] `DATABITS;
       // if this data has been accessed within our transaction, we want to
       // stop others from touching it.
       sig_tmv <= (in_tr & (cmem[1] `DIRTYBIT | cmem[1] `TIMEBIT));
       // send the dirty bit over as well so that the other cache can
-      // comprehend if it is also in transaction 
-      ccdatadirty <= cmem[1] `DIRTYBIT; 
+      // comprehend if it is also in transaction
+      ccdatadirty <= cmem[1] `DIRTYBIT;
     end
-		else if(cmem[2] `ADDRBITS == occaddr) begin 
-      ccrdata <= cmem[2] `DATABITS; 
+		else if(cmem[2] `ADDRBITS == occaddr) begin
+      ccrdata <= cmem[2] `DATABITS;
       // if this data has been accessed within our transaction, we want to
       // stop others from touching it.
       sig_tmv <= (in_tr & (cmem[2] `DIRTYBIT | cmem[2] `TIMEBIT));
       // send the dirty bit over as well so that the other cache can
-      // comprehend if it is also in transaction 
-      ccdatadirty <= cmem[2] `DIRTYBIT; 
+      // comprehend if it is also in transaction
+      ccdatadirty <= cmem[2] `DIRTYBIT;
     end
-		else if(cmem[3] `ADDRBITS == occaddr) begin 
-      ccrdata <= cmem[3] `DATABITS; 
+		else if(cmem[3] `ADDRBITS == occaddr) begin
+      ccrdata <= cmem[3] `DATABITS;
       // if this data has been accessed within our transaction, we want to
       // stop others from touching it.
       sig_tmv <= (in_tr & (cmem[3] `DIRTYBIT | cmem[3] `TIMEBIT));
       // send the dirty bit over as well so that the other cache can
-      // comprehend if it is also in transaction 
-      ccdatadirty <= cmem[3] `DIRTYBIT; 
+      // comprehend if it is also in transaction
+      ccdatadirty <= cmem[3] `DIRTYBIT;
     end
-		else if(cmem[4] `ADDRBITS == occaddr) begin 
-      ccrdata <= cmem[4] `DATABITS; 
+		else if(cmem[4] `ADDRBITS == occaddr) begin
+      ccrdata <= cmem[4] `DATABITS;
       // if this data has been accessed within our transaction, we want to
       // stop others from touching it.
       sig_tmv <= (in_tr & (cmem[4] `DIRTYBIT | cmem[4] `TIMEBIT));
       // send the dirty bit over as well so that the other cache can
-      // comprehend if it is also in transaction 
-      ccdatadirty <= cmem[4] `DIRTYBIT; 
+      // comprehend if it is also in transaction
+      ccdatadirty <= cmem[4] `DIRTYBIT;
     end
-		else if(cmem[5] `ADDRBITS == occaddr) begin 
-      ccrdata <= cmem[5] `DATABITS; 
+		else if(cmem[5] `ADDRBITS == occaddr) begin
+      ccrdata <= cmem[5] `DATABITS;
       // if this data has been accessed within our transaction, we want to
       // stop others from touching it.
       sig_tmv <= (in_tr & (cmem[5] `DIRTYBIT | cmem[5] `TIMEBIT));
       // send the dirty bit over as well so that the other cache can
-      // comprehend if it is also in transaction 
-      ccdatadirty <= cmem[5] `DIRTYBIT; 
+      // comprehend if it is also in transaction
+      ccdatadirty <= cmem[5] `DIRTYBIT;
     end
-		else if(cmem[6] `ADDRBITS == occaddr) begin 
-      ccrdata <= cmem[6] `DATABITS; 
+		else if(cmem[6] `ADDRBITS == occaddr) begin
+      ccrdata <= cmem[6] `DATABITS;
       // if this data has been accessed within our transaction, we want to
       // stop others from touching it.
       sig_tmv <= (in_tr & (cmem[6] `DIRTYBIT | cmem[6] `TIMEBIT));
       // send the dirty bit over as well so that the other cache can
-      // comprehend if it is also in transaction 
-      ccdatadirty <= cmem[6] `DIRTYBIT; 
+      // comprehend if it is also in transaction
+      ccdatadirty <= cmem[6] `DIRTYBIT;
     end
-		else if(cmem[7] `ADDRBITS == occaddr) begin 
-      ccrdata <= cmem[7] `DATABITS; 
+		else if(cmem[7] `ADDRBITS == occaddr) begin
+      ccrdata <= cmem[7] `DATABITS;
       // if this data has been accessed within our transaction, we want to
       // stop others from touching it.
       sig_tmv <= (in_tr & (cmem[7] `DIRTYBIT | cmem[7] `TIMEBIT));
       // send the dirty bit over as well so that the other cache can
-      // comprehend if it is also in transaction 
-      ccdatadirty <= cmem[7] `DIRTYBIT; 
+      // comprehend if it is also in transaction
+      ccdatadirty <= cmem[7] `DIRTYBIT;
     end
 		else begin occmiss <= 1; end
 	end
@@ -630,8 +636,8 @@ always @(posedge clk) begin
 			smstrobe <= 1;
 			smwrite <= 0;
 		end else begin
-      sig_tmv <= (in_tr & (wtoo | occdatadirty)); 
-      //TODO: shouldnt this be occrdata? 
+      sig_tmv <= (in_tr & (wtoo | occdatadirty));
+      //TODO: shouldnt this be occrdata?
       //Found data in other cache
 		  if(cmem[0] `ADDRBITS == ccaddr) begin
 			  if(wtoo) begin cmem[0] `DATABITS <= wdata; end
@@ -828,6 +834,9 @@ assign s1src = (s1ir `IOPLEN == 0)
 		// only sign extend long instructions if immediate
 		: ((s1typ == `ILTypeImm) ? {{12{s1ir `IL_SRCS}}, s1ir `IL_SRC} : s1ir `IL_SRC);
 
+assign in_tr = (s1op == `OPjerr || s1op == `OPfail) ? 1:0;                    //added by praneeth
+assign in_tr = (s1op == `OPcom)? 0 : in_tr;
+
 // Stage 2: Read registers
 assign s2blocked =
 	// Block until dst register isn't being written to later in the pipeline
@@ -862,7 +871,8 @@ always @(posedge clk) begin
 			`ILTypeImm: s2src <= s1src;
 			// 4 bit wrapping offset for undo stack
 			`ILTypeUnd: s2src <= u[s2undidx];
-			`ILTypeReg, `ILTypeMem: s2src <= r[s1src];
+//			`ILTypeReg, `ILTypeMem: s2src <= r[s1src];
+			`ILTypeReg, `ILTypeMem: address <= s1src; strobe<=1;       //Added by Praneeth
 		endcase
 		s2dst <= r[s1dst];
 		s2dstreg <= s1dst;
