@@ -113,20 +113,45 @@ wire smwrite0, smwrite1;
 wire smupdate0, smupdate1;
 wire fetching;
 wire whichcache;
+wire sig_tmv1, sigtmv0;
+wire sig_tmv;
+assign sig_tmv = sig_tmv1 | sig_tmv0;
+
+
+
+
+// wire clocked assignment
+reg smupdate1_reg; 
+assign smupdate1 = smupdate1_reg;
+reg smupdate0_reg;
+assign smupdate0 = smupdate0_reg;
+reg wtoo_reg;
+assign wtoo = wtoo_reg;
+reg strobe1_reg;
+assign strobe1 = strobe1_reg;
+reg strobe0_reg;
+assign stobe0 = strobe0_reg;
+reg strobe_reg;
+assign strobe = strobe_reg;
+
+wire `LINEADDR ccaddr0_wire;
+always @(posedge clk) begin
+   ccaddr0 <= ccaddr0_wire;
+end
 
 slowmem16 DATAMEM(rdy, rdata, addr, wdata, wtoo, strobe, clk);
 
-core PE0(halt0, reset, clk, rdata0, addr0, wdata0, wtoo0, strobe0, in_tr0, stall0);
+core PE0(halt0, reset, clk, rdata0, addr0, wdata0, wtoo0, strobe0, in_tr0, stall0, sig_tmv);
 cache C0(reset, rdata0, addr0, wdata0, wtoo0, strobe0, clk, in_tr0,
-ccstrobe0, ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0, ccwdata0, ccstrobe1,
+ccstrobe0, ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0_wire, ccwdata0, ccstrobe1,
 ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, stall0, smstrobe0,
-smwrite0, smupdate0, smrdata0, smaddr0, smwdata0);
+smwrite0, smupdate0, smrdata0, smaddr0, smwdata0, sig_tmv0);
 
-core PE1(halt1, reset, clk, rdata1, addr1, wdata1, wtoo1, strobe1, in_tr1, stall1);
+core PE1(halt1, reset, clk, rdata1, addr1, wdata1, wtoo1, strobe1, in_tr1, stall1, sig_tmv);
 cache C1(reset, rdata1, addr1, wdata1, wtoo1, strobe1, clk, in_tr1,
 ccstrobe1, ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, ccstrobe0,
-ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0, ccwdata0, stall1, smstrobe1,
-smwrite1, smupdate1, smrdata1, smaddr1, smwdata1);
+ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0_wire, ccwdata0, stall1, smstrobe1,
+smwrite1, smupdate1, smrdata1, smaddr1, smwdata1, sig_tmv1);
 
 //Halting logic
 always @(posedge clk) begin
@@ -138,19 +163,19 @@ end
 //Strobe resolver
 always @(posedge clk) begin
   if(strobe) begin
-	  strobe <= 0;
+	  strobe_reg <= 0;
 	end
 	if(strobe0) begin
-	  strobe0 <= 0;
+	  strobe0_reg <= 0;
 	end
 	if(strobe1) begin
-	  strobe1 <= 0;
+	  strobe1_reg <= 0;
 	end
 	if(smupdate0) begin
-	  smupdate0 <= 0;
+	  smupdate0_reg <= 0;
 	end
 	if(smupdate1) begin
-    smupdate1 <= 0;
+    smupdate1_reg <= 0;
 	end
 end
 
@@ -165,9 +190,9 @@ always @(posedge clk) begin
 			whichcache <= 0;
 			if(smwrite0) begin
 			  wdata <= smwdata0;
-				wtoo <= 1;
+				wtoo_reg <= 1;
 			end else begin
-			  wtoo <= 0;
+			  wtoo_reg <= 0;
 			end
 		end else if(smstrobe1) begin
 		  addr <= smaddr1;
@@ -176,22 +201,23 @@ always @(posedge clk) begin
 			whichcache <= 1;
 			if(smwrite1) begin
 			  wdata <= smwdata1;
-				wtoo <= 1;
+				wtoo_reg <= 1;
 			end else begin
-			  wtoo <= 0;
+			  wtoo_reg <= 0;
 			end
+    end
 	end else if(rdy) begin
 	  fetching <= 0;
 		if(!whichcache) begin
-		  smupdate0 <= 1;
+		  smupdate0_reg <= 1;
 			smrdata0 <= rdata;
 			rdata0 <= rdata;
 		end else begin
-		  smupdate1 <= 1;
+		  smupdate1_reg <= 1;
 			smrdata1 <= rdata;
 			rdata1 <= rdata;
-		end
-	end
+    end
+  end
 end
 endmodule
 
@@ -236,7 +262,7 @@ endmodule
 module cache (reset, rdata, addr, wdata, wtoo, strobe, clk,
 in_tr, ccstrobe, ccupdate, ccupdatedone, ccmiss, ccrdata, ccaddr, ccwdata, occstrobe,
 occupdate, occupdatedone, occmiss, occrdata, occaddr, occwdata, stall, smstrobe,
-smwrite, smupdate, smrdata, smaddr, smwdata);
+smwrite, smupdate, smrdata, smaddr, smwdata, sig_tmv);
 input reset;
 
 // Basic cache connections
@@ -273,6 +299,9 @@ input smupdate; //Slow memory update
 input `LINE smrdata; //Slow memory read data
 inout `LINEADDR smaddr; //Slow memory address
 output `LINE smwdata; //Slow memory write data
+
+output sig_tmv;
+wire sig_tmv;
 
 reg `CLINE cmem `CLINES; //Cache memory
 reg `CPTR cindex; //Current number of cache lines
@@ -511,7 +540,12 @@ always @(posedge clk) begin
   if(occupdate) begin
     occupdate <= 0;
 		occupdatedone <= 1;
-    if(cmem[0] `ADDRBITS == occaddr) begin ccrdata <= cmem[0] `DATABITS; end
+    if(cmem[0] `ADDRBITS == occaddr) begin 
+      ccrdata <= cmem[0] `DATABITS; 
+      // if this data has been accessed within our transaction, we want to
+      // stop others from touching it.
+      sig_tmv <= (in_tr & (cmem[0] `DIRTYBIT | cmem[0] `TIMEBIT));
+    end
 		else if(cmem[1] `ADDRBITS == occaddr) begin ccrdata <= cmem[1] `DATABITS; end
 		else if(cmem[2] `ADDRBITS == occaddr) begin ccrdata <= cmem[2] `DATABITS; end
 		else if(cmem[3] `ADDRBITS == occaddr) begin ccrdata <= cmem[3] `DATABITS; end
@@ -533,6 +567,7 @@ always @(posedge clk) begin
 			smstrobe <= 1;
 			smwrite <= 0;
 		end else begin
+      sig_tmv <= (in_tr & wtoo); 
       //Found data in other cache
 		  if(cmem[0] `ADDRBITS == ccaddr) begin
 			  if(wtoo) begin cmem[0] `DATABITS <= wdata; end
@@ -635,9 +670,10 @@ always @(posedge clk) begin
 end
 endmodule
 
-module core (halt, reset, clk, rdata, addr, wdata, wtoo, strobe, in_tr, stall);
+module core (halt, reset, clk, rdata, addr, wdata, wtoo, strobe, in_tr, stall, sig_tmv);
 output reg halt;
-input reset, clk;
+input reset, clk, sig_tmv;
+wire sig_tmv;
 reg `WORD  r  `REGSIZE;
 reg `WORD  dm `MEMSIZE;
 reg `WORD  im `MEMSIZE;

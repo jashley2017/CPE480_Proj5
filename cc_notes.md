@@ -29,6 +29,14 @@
 4. Do the cache operation in your own cache
 
 
+
+
+
+
+
+
+
+
 ## Verilog Notes
 Cache variables of note:
     * ccaddr - the addr the other cache is working on. This should be compared against the addrs in the cache and set the occstrobe (output ccstrobe) high if found.
