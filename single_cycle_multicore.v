@@ -107,19 +107,20 @@ wire ccstrobe0, ccstrobe1, smstrobe0, smstrobe1;
 wire ccupdate0, ccupdate1;
 wire ccupdatedone0, ccupdatedone1;
 wire ccmiss0, ccmiss1;
+wire ccdatadirty0, ccdatadirty1;
 wire in_tr0, in_tr1;
 wire stall0, stall1;
 wire smwrite0, smwrite1;
 wire smupdate0, smupdate1;
 wire fetching;
 wire whichcache;
-wire sig_tmv1, sigtmv0;
+wire sig_tmv1, sig_tmv0;
 wire sig_tmv;
 assign sig_tmv = sig_tmv1 | sig_tmv0;
 
 
 
-
+// TODO: David, here are examples of how to fix wire, reg problems
 // wire clocked assignment
 reg smupdate1_reg; 
 assign smupdate1 = smupdate1_reg;
@@ -133,7 +134,7 @@ reg strobe0_reg;
 assign stobe0 = strobe0_reg;
 reg strobe_reg;
 assign strobe = strobe_reg;
-
+// wire module inout to reg assignment
 wire `LINEADDR ccaddr0_wire;
 always @(posedge clk) begin
    ccaddr0 <= ccaddr0_wire;
@@ -143,14 +144,14 @@ slowmem16 DATAMEM(rdy, rdata, addr, wdata, wtoo, strobe, clk);
 
 core PE0(halt0, reset, clk, rdata0, addr0, wdata0, wtoo0, strobe0, in_tr0, stall0, sig_tmv);
 cache C0(reset, rdata0, addr0, wdata0, wtoo0, strobe0, clk, in_tr0,
-ccstrobe0, ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0_wire, ccwdata0, ccstrobe1,
-ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, stall0, smstrobe0,
+ccstrobe0, ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0_wire, ccwdata0, ccdatadirty0, ccstrobe1,
+ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, ccdatadirty1, stall0, smstrobe0,
 smwrite0, smupdate0, smrdata0, smaddr0, smwdata0, sig_tmv0);
 
 core PE1(halt1, reset, clk, rdata1, addr1, wdata1, wtoo1, strobe1, in_tr1, stall1, sig_tmv);
 cache C1(reset, rdata1, addr1, wdata1, wtoo1, strobe1, clk, in_tr1,
-ccstrobe1, ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, ccstrobe0,
-ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0_wire, ccwdata0, stall1, smstrobe1,
+ccstrobe1, ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, ccdatadirty1, ccstrobe0,
+ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0_wire, ccwdata0, ccdatadirty0, stall1, smstrobe1,
 smwrite1, smupdate1, smrdata1, smaddr1, smwdata1, sig_tmv1);
 
 //Halting logic
@@ -260,8 +261,8 @@ end
 endmodule
 
 module cache (reset, rdata, addr, wdata, wtoo, strobe, clk,
-in_tr, ccstrobe, ccupdate, ccupdatedone, ccmiss, ccrdata, ccaddr, ccwdata, occstrobe,
-occupdate, occupdatedone, occmiss, occrdata, occaddr, occwdata, stall, smstrobe,
+in_tr, ccstrobe, ccupdate, ccupdatedone, ccmiss, ccrdata, ccaddr, ccwdata, ccdatadirty, occstrobe,
+occupdate, occupdatedone, occmiss, occrdata, occaddr, occwdata, occdatadirty, stall, smstrobe,
 smwrite, smupdate, smrdata, smaddr, smwdata, sig_tmv);
 input reset;
 
@@ -280,6 +281,9 @@ input ccmiss; //Cache coherency miss
 input `LINE ccrdata; //Cache coherency read data
 inout `LINEADDR ccaddr; //Cache coherency address
 output `LINE ccwdata; //Cache coherency write data
+
+output ccdatadirty;
+input occdatadirty;
 
 // Other cache coherency connections
 inout occstrobe; //Is the other cache updating me?
@@ -545,14 +549,73 @@ always @(posedge clk) begin
       // if this data has been accessed within our transaction, we want to
       // stop others from touching it.
       sig_tmv <= (in_tr & (cmem[0] `DIRTYBIT | cmem[0] `TIMEBIT));
+      // send the dirty bit over as well so that the other cache can
+      // comprehend if it is also in transaction 
+      ccdatadirty <= cmem[0] `DIRTYBIT; 
     end
-		else if(cmem[1] `ADDRBITS == occaddr) begin ccrdata <= cmem[1] `DATABITS; end
-		else if(cmem[2] `ADDRBITS == occaddr) begin ccrdata <= cmem[2] `DATABITS; end
-		else if(cmem[3] `ADDRBITS == occaddr) begin ccrdata <= cmem[3] `DATABITS; end
-		else if(cmem[4] `ADDRBITS == occaddr) begin ccrdata <= cmem[4] `DATABITS; end
-		else if(cmem[5] `ADDRBITS == occaddr) begin ccrdata <= cmem[5] `DATABITS; end
-		else if(cmem[6] `ADDRBITS == occaddr) begin ccrdata <= cmem[6] `DATABITS; end
-		else if(cmem[7] `ADDRBITS == occaddr) begin ccrdata <= cmem[7] `DATABITS; end
+		else if(cmem[1] `ADDRBITS == occaddr) begin 
+      ccrdata <= cmem[1] `DATABITS; 
+      // if this data has been accessed within our transaction, we want to
+      // stop others from touching it.
+      sig_tmv <= (in_tr & (cmem[1] `DIRTYBIT | cmem[1] `TIMEBIT));
+      // send the dirty bit over as well so that the other cache can
+      // comprehend if it is also in transaction 
+      ccdatadirty <= cmem[1] `DIRTYBIT; 
+    end
+		else if(cmem[2] `ADDRBITS == occaddr) begin 
+      ccrdata <= cmem[2] `DATABITS; 
+      // if this data has been accessed within our transaction, we want to
+      // stop others from touching it.
+      sig_tmv <= (in_tr & (cmem[2] `DIRTYBIT | cmem[2] `TIMEBIT));
+      // send the dirty bit over as well so that the other cache can
+      // comprehend if it is also in transaction 
+      ccdatadirty <= cmem[2] `DIRTYBIT; 
+    end
+		else if(cmem[3] `ADDRBITS == occaddr) begin 
+      ccrdata <= cmem[3] `DATABITS; 
+      // if this data has been accessed within our transaction, we want to
+      // stop others from touching it.
+      sig_tmv <= (in_tr & (cmem[3] `DIRTYBIT | cmem[3] `TIMEBIT));
+      // send the dirty bit over as well so that the other cache can
+      // comprehend if it is also in transaction 
+      ccdatadirty <= cmem[3] `DIRTYBIT; 
+    end
+		else if(cmem[4] `ADDRBITS == occaddr) begin 
+      ccrdata <= cmem[4] `DATABITS; 
+      // if this data has been accessed within our transaction, we want to
+      // stop others from touching it.
+      sig_tmv <= (in_tr & (cmem[4] `DIRTYBIT | cmem[4] `TIMEBIT));
+      // send the dirty bit over as well so that the other cache can
+      // comprehend if it is also in transaction 
+      ccdatadirty <= cmem[4] `DIRTYBIT; 
+    end
+		else if(cmem[5] `ADDRBITS == occaddr) begin 
+      ccrdata <= cmem[5] `DATABITS; 
+      // if this data has been accessed within our transaction, we want to
+      // stop others from touching it.
+      sig_tmv <= (in_tr & (cmem[5] `DIRTYBIT | cmem[5] `TIMEBIT));
+      // send the dirty bit over as well so that the other cache can
+      // comprehend if it is also in transaction 
+      ccdatadirty <= cmem[5] `DIRTYBIT; 
+    end
+		else if(cmem[6] `ADDRBITS == occaddr) begin 
+      ccrdata <= cmem[6] `DATABITS; 
+      // if this data has been accessed within our transaction, we want to
+      // stop others from touching it.
+      sig_tmv <= (in_tr & (cmem[6] `DIRTYBIT | cmem[6] `TIMEBIT));
+      // send the dirty bit over as well so that the other cache can
+      // comprehend if it is also in transaction 
+      ccdatadirty <= cmem[6] `DIRTYBIT; 
+    end
+		else if(cmem[7] `ADDRBITS == occaddr) begin 
+      ccrdata <= cmem[7] `DATABITS; 
+      // if this data has been accessed within our transaction, we want to
+      // stop others from touching it.
+      sig_tmv <= (in_tr & (cmem[7] `DIRTYBIT | cmem[7] `TIMEBIT));
+      // send the dirty bit over as well so that the other cache can
+      // comprehend if it is also in transaction 
+      ccdatadirty <= cmem[7] `DIRTYBIT; 
+    end
 		else begin occmiss <= 1; end
 	end
 end
@@ -567,7 +630,8 @@ always @(posedge clk) begin
 			smstrobe <= 1;
 			smwrite <= 0;
 		end else begin
-      sig_tmv <= (in_tr & wtoo); 
+      sig_tmv <= (in_tr & (wtoo | occdatadirty)); 
+      //TODO: shouldnt this be occrdata? 
       //Found data in other cache
 		  if(cmem[0] `ADDRBITS == ccaddr) begin
 			  if(wtoo) begin cmem[0] `DATABITS <= wdata; end
