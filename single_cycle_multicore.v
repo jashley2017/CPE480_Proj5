@@ -144,24 +144,28 @@ reg whichcache_reg;
 assign whichcache = whichcache_reg;
 reg strobe_reg; 
 assign strobe = strobe_reg; 
-// wire module inout to reg assignment
-wire `LINEADDR ccaddr0_wire;
-always @(posedge clk) begin
-   ccaddr0 <= ccaddr0_wire;
-end
+reg `LINE smrdata1_reg;
+assign smrdata1 = smrdata1_reg;
+reg `LINE smrdata0_reg;
+assign smrdata0 = smrdata0_reg;
+reg `LINEADDR addr_reg;
+assign addr = addr_reg;
+reg `LINE wdata_reg; 
+assign wdata = wdata_reg;
+
 
 slowmem16 DATAMEM(rdy, rdata, addr, wdata, wtoo, strobe, clk);
 
 core PE0(halt0, reset, clk, rdata0, addr0, wdata0, wtoo0, strobe0, in_tr0, stall0, sig_tmv);
 cache C0(reset, rdata0, addr0, wdata0, wtoo0, strobe0, clk, in_tr0,
-ccstrobe0, ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0_wire, ccwdata0, ccdatadirty0, ccstrobe1,
+ccstrobe0, ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0, ccwdata0, ccdatadirty0, ccstrobe1,
 ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, ccdatadirty1, stall0, smstrobe0,
 smwrite0, smupdate0, smrdata0, smaddr0, smwdata0, sig_tmv0);
 
 core PE1(halt1, reset, clk, rdata1, addr1, wdata1, wtoo1, strobe1, in_tr1, stall1, sig_tmv);
 cache C1(reset, rdata1, addr1, wdata1, wtoo1, strobe1, clk, in_tr1,
 ccstrobe1, ccupdate1, ccupdatedone1, ccmiss1, ccrdata1, ccaddr1, ccwdata1, ccdatadirty1, ccstrobe0,
-ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0_wire, ccwdata0, ccdatadirty0, stall1, smstrobe1,
+ccupdate0, ccupdatedone0, ccmiss0, ccrdata0, ccaddr0, ccwdata0, ccdatadirty0, stall1, smstrobe1,
 smwrite1, smupdate1, smrdata1, smaddr1, smwdata1, sig_tmv1);
 
 //Halting logic
@@ -195,23 +199,23 @@ always @(posedge clk) begin
   if(!fetching) begin
 	  //Always prioritize cache0 requests
 	  if(smstrobe0) begin
-		  addr <= smaddr0;
+		  addr_reg <= smaddr0;
 			strobe_reg <= 1;
 			fetch_reg <= 1;
 			whichcache_reg <= 0;
 			if(smwrite0) begin
-			  wdata <= smwdata0;
+			  wdata_reg <= smwdata0;
 				wtoo_reg <= 1;
 			end else begin
 			  wtoo_reg <= 0;
 			end
 		end else if(smstrobe1) begin
-		  addr <= smaddr1;
+		  addr_reg <= smaddr1;
 			strobe_reg <= 1;
 			fetch_reg <= 1;
 			whichcache_reg <= 1;
 			if(smwrite1) begin
-			  wdata <= smwdata1;
+			  wdata_reg <= smwdata1;
 				wtoo_reg <= 1;
 			end else begin
 			  wtoo_reg <= 0;
@@ -221,12 +225,12 @@ always @(posedge clk) begin
 	  fetch_reg <= 0;
 		if(!whichcache) begin
 		  smupdate0_reg <= 1;
-			smrdata0 <= rdata;
-			rdata0 <= rdata;
+			smrdata0_reg <= rdata;
+			// rdata0 <= rdata;
 		end else begin
 		  smupdate1_reg <= 1;
-			smrdata1 <= rdata;
-			rdata1 <= rdata;
+			smrdata1_reg <= rdata;
+			// rdata1 <= rdata;
     end
   end
 end
@@ -292,8 +296,8 @@ input `LINE ccrdata; //Cache coherency read data
 inout `LINEADDR ccaddr; //Cache coherency address
 output `LINE ccwdata; //Cache coherency write data
 
-output ccdatadirty;
-input occdatadirty;
+input ccdatadirty;
+output occdatadirty;
 
 // Other cache coherency connections
 inout occstrobe; //Is the other cache updating me?
@@ -345,8 +349,7 @@ assign ccupdatedone = ccupdatedone_reg;
 assign occupdatedone = occupdatedone_reg;
 reg occmiss_reg;
 assign occmiss = occmiss_reg;
-reg ccdatadirty_reg, occdatadirty_reg;
-assign ccdatadirty = ccdatadirty_reg; 
+reg occdatadirty_reg;
 assign occdatadirty = occdatadirty_reg;
 reg stall_reg;
 assign stall = stall_reg;
@@ -778,8 +781,21 @@ endmodule
 
 module core (halt, reset, clk, rdata, addr, wdata, wtoo, strobe, in_tr, stall, sig_tmv);
 output reg halt;
-input reset, clk, sig_tmv;
+
+// processor module things
+input reset, clk, sig_tmv, stall;
+input `WORD rdata;
+output `WORD wdata;
+output `WORD addr;
+reg `WORD addr_reg; 
+assign addr = addr_reg;
+output strobe, in_tr, wtoo;
+reg strobe_reg; 
+assign strobe = strobe_reg;
+
+
 wire sig_tmv;
+
 reg `WORD  r  `REGSIZE;
 reg `WORD  dm `MEMSIZE;
 reg `WORD  im `MEMSIZE;
@@ -908,7 +924,7 @@ always @(posedge clk) begin
 			// 4 bit wrapping offset for undo stack
 			`ILTypeUnd: s2src <= u[s2undidx];
 //			`ILTypeReg, `ILTypeMem: s2src <= r[s1src];
-			`ILTypeReg, `ILTypeMem: address <= s1src; strobe<=1;       //Added by Praneeth
+      `ILTypeReg, `ILTypeMem: begin addr_reg <= s1src; strobe_reg<=1;   end    //Added by Praneeth
 		endcase
 		s2dst <= r[s1dst];
 		s2dstreg <= s1dst;
